@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, History, Download, ChevronDown, ChevronUp, CheckCircle2, Clock } from 'lucide-react';
 import { SyncRecord } from '../types/inventory';
-
+import { MAX_HISTORY_RECORDS } from '../lib/constants';
+import { isDarkColor } from '../lib/colorUtils';
 
 interface HistoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   records: SyncRecord[];
+  /** Descarga el CSV del borrador actual. Devuelve `false` si no hay nada que exportar. */
   onExportCSV: () => boolean;
   currentDraftUnits: number;
 }
+
+interface ExportFeedback {
+  text: string;
+  ok: boolean;
+}
+
+const FEEDBACK_DURATION_MS = 3000;
 
 export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   isOpen,
@@ -19,7 +28,16 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   currentDraftUnits,
 }) => {
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
-  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+  const [exportFeedback, setExportFeedback] = useState<ExportFeedback | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Evita setState tras desmontar y timers superpuestos
+  useEffect(
+    () => () => {
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    },
+    []
+  );
 
   if (!isOpen) return null;
 
@@ -28,25 +46,21 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
   };
 
   const handleExportCSV = () => {
-    const success = onExportCSV();
-    if (success) {
-      setExportFeedback('¡CSV descargado con éxito!');
-      setTimeout(() => setExportFeedback(null), 3000);
-    } else {
-      setExportFeedback('Sin prendas contadas en el borrador actual.');
-      setTimeout(() => setExportFeedback(null), 3000);
-    }
-  };
-
-  const isDarkColor = (hex: string) => {
-    const darkHexes = ['#18181B', '#831843', '#78350F'];
-    return darkHexes.includes(hex.toUpperCase());
+    const ok = onExportCSV();
+    setExportFeedback({
+      ok,
+      text: ok ? '¡CSV descargado con éxito!' : 'Sin prendas contadas en el borrador actual.',
+    });
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = setTimeout(() => setExportFeedback(null), FEEDBACK_DURATION_MS);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm transition-opacity duration-200"
       onClick={onClose}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       <div
         className="w-full max-w-md mx-auto max-h-[90dvh] flex flex-col bg-card border-t border-x border-border-subtle rounded-t-2xl shadow-2xl overflow-hidden select-none"
@@ -69,7 +83,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
                   Historial de Lotes
                 </h2>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700">
-                  {records.length}/10
+                  {records.length}/{MAX_HISTORY_RECORDS}
                 </span>
               </div>
               <p className="text-[10px] text-text-secondary leading-tight">
@@ -194,12 +208,12 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({
           {exportFeedback && (
             <div
               className={`text-[11px] font-semibold text-center px-2 py-1 rounded transition-all ${
-                exportFeedback.includes('éxito')
+                exportFeedback.ok
                   ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
                   : 'bg-amber-950/60 text-amber-300 border border-amber-800/60'
               }`}
             >
-              {exportFeedback}
+              {exportFeedback.text}
             </div>
           )}
 

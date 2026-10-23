@@ -1,219 +1,202 @@
-import { useState, useCallback, useMemo } from 'react';
-import { CountsMap, InventoryCountRow, SyncRecord, SyncRecordItem, SyncRecordColorBreakdown } from '../types/inventory';
-import { LOCAL_STORAGE_KEY, SYNC_HISTORY_STORAGE_KEY, MAX_HISTORY_RECORDS, INITIAL_PRODUCTS, INITIAL_COLORS } from '../lib/constants';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { CountsMap, SyncRecord } from '../types/inventory';
+import { MAX_HISTORY_RECORDS, INITIAL_PRODUCTS, INITIAL_COLORS } from '../lib/constants';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { exportInventoryToCSV } from '../lib/csvExport';
+import { triggerHaptic } from '../lib/haptics';
+import { readCounts, writeCounts, clearCounts, readHistory, writeHistory } from '../lib/storage';
+import {
+  buildInventorySummary,
+  summaryToRows,
+  summaryTotal,
+  subtractCounts,
+} from '../lib/inventorySummary';
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
-function formatDisplayTimestamp(date: Date = new Date()): string {
-  const day = date.getDate();
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  const month = months[date.getMonth()];
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${day} ${month}, ${hours}:${minutes}`;
+interface SyncState {
+  status: SyncStatus;
+  message: string;
 }
 
+const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/**
+ * Formatea una fecha para mostrarla en el historial (ej. `18 Oct, 15:30`).
+ *
+ * @param date Fecha a formatear (por defecto, ahora).
+ * @returns Texto legible en español.
+ */
+function formatDisplayTimestamp(date: Date = new Date()): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}, ${hours}:${minutes}`;
+}
+
+/**
+ * Hook principal del inventario: conteo por producto/color, persistencia
+ * offline-first en `localStorage` y sincronización con Supabase.
+ *
+ * - Cada cambio se persiste de forma síncrona e inmediata.
+ * - El borrador solo se descuenta tras un INSERT exitoso en Supabase, y únicamente
+ *   por lo que se envió: lo editado durante la sincronización se conserva.
+ * - Sin credenciales de Supabase la sincronización falla de forma explícita y
+ *   el borrador permanece intacto.
+ */
 export function useInventory() {
-  const [counts, setCounts] = useState<CountsMap>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Error reading from localStorage:', e);
-    }
-    return {};
-  });
+  const [counts, setCounts] = useState<CountsMap>(readCounts);
+  const [syncHistory, setSyncHistory] = useState<SyncRecord[]>(readHistory);
+  const [syncState, setSyncState] = useState<SyncState>({ status: 'idle', message: '' });
 
-  const [syncHistory, setSyncHistory] = useState<SyncRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(SYNC_HISTORY_STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Error reading sync history from localStorage:', e);
-    }
-    return [];
-  });
+  // Espejo síncrono de `counts`: permite escrituras puras y sin pérdidas entre renders.
+  const countsRef = useRef<CountsMap>(counts);
+  const isSyncingRef = useRef(false);
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [syncMessage, setSyncMessage] = useState<string>('');
-
-  // Persistir en localStorage en cada actualización
-  const persistCounts = useCallback((newCounts: CountsMap) => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newCounts));
-    } catch (e) {
-      console.error('Error saving to localStorage:', e);
-    }
+  /** Aplica y persiste un nuevo mapa de conteos. */
+  const commitCounts = useCallback((next: CountsMap) => {
+    countsRef.current = next;
+    writeCounts(next);
+    setCounts(next);
   }, []);
 
-  const getQuantity = useCallback((productId: string, colorId: string): number => {
-    return counts[productId]?.[colorId] ?? 0;
-  }, [counts]);
+  const getQuantity = useCallback(
+    (productId: string, colorId: string): number => counts[productId]?.[colorId] ?? 0,
+    [counts]
+  );
 
-  const updateQuantity = useCallback((productId: string, colorId: string, value: number) => {
-    setCounts((prev) => {
-      const safeVal = isNaN(value) ? 0 : Math.max(0, Math.floor(value));
-      const nextProductCounts = { ...(prev[productId] || {}) };
-      
+  /**
+   * Fija la cantidad de un color en un producto y la persiste de inmediato.
+   * Valores negativos, decimales o NaN se sanean (>= 0, entero); 0 elimina la entrada.
+   *
+   * @param productId Id del producto.
+   * @param colorId Id del color.
+   * @param value Nueva cantidad.
+   */
+  const updateQuantity = useCallback(
+    (productId: string, colorId: string, value: number) => {
+      const safeVal = Number.isNaN(value) ? 0 : Math.max(0, Math.floor(value));
+      const prev = countsRef.current;
+      const nextProduct = { ...(prev[productId] || {}) };
+
       if (safeVal === 0) {
-        delete nextProductCounts[colorId];
+        delete nextProduct[colorId];
       } else {
-        nextProductCounts[colorId] = safeVal;
+        nextProduct[colorId] = safeVal;
       }
 
-      const nextCounts = { ...prev, [productId]: nextProductCounts };
-      persistCounts(nextCounts);
-      return nextCounts;
-    });
+      commitCounts({ ...prev, [productId]: nextProduct });
 
-    // Resetear status de sync si se vuelve a editar
-    if (syncStatus !== 'idle') {
-      setSyncStatus('idle');
-      setSyncMessage('');
-    }
-  }, [persistCounts, syncStatus]);
+      // Resetear el estado de sync (éxito/error) al volver a editar; no interrumpir un sync en curso.
+      setSyncState((s) => (s.status === 'success' || s.status === 'error' ? { status: 'idle', message: '' } : s));
+    },
+    [commitCounts]
+  );
 
-  const getProductTotal = useCallback((productId: string): number => {
-    const productCounts = counts[productId];
-    if (!productCounts) return 0;
-    return Object.values(productCounts).reduce((acc, curr) => acc + (curr || 0), 0);
-  }, [counts]);
+  const getProductTotal = useCallback(
+    (productId: string): number =>
+      Object.values(counts[productId] ?? {}).reduce((acc, curr) => acc + (curr || 0), 0),
+    [counts]
+  );
 
-  const grandTotal = useMemo(() => {
-    let total = 0;
-    Object.values(counts).forEach((prodMap) => {
-      if (prodMap) {
-        Object.values(prodMap).forEach((val) => {
-          total += val || 0;
-        });
-      }
-    });
-    return total;
-  }, [counts]);
+  const grandTotal = useMemo(
+    () =>
+      Object.values(counts).reduce(
+        (total, prodMap) => total + Object.values(prodMap ?? {}).reduce((a, v) => a + (v || 0), 0),
+        0
+      ),
+    [counts]
+  );
 
-  const triggerHaptic = useCallback((duration: number = 10) => {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(duration);
-      } catch {
-        // Ignorar si el navegador bloquea la vibración sin interacción previa
-      }
-    }
-  }, []);
+  /**
+   * Envía el conteo actual a Supabase (tabla `inventory_counts`).
+   *
+   * @returns `true` si se guardó correctamente; `false` si no había datos, faltan
+   * credenciales, hay otro sync en curso o Supabase devolvió un error. Nunca lanza.
+   */
+  const syncToSupabase = useCallback(async (): Promise<boolean> => {
+    if (isSyncingRef.current) return false;
 
-  const syncToSupabase = async (): Promise<boolean> => {
-    // Si no hay productos contados
-    if (grandTotal === 0) {
-      setSyncStatus('error');
-      setSyncMessage('No hay prendas contadas para sincronizar.');
+    const snapshot = countsRef.current;
+    const summary = buildInventorySummary(snapshot, INITIAL_PRODUCTS, INITIAL_COLORS);
+    const unitsSent = summaryTotal(summary);
+
+    if (unitsSent === 0) {
+      setSyncState({ status: 'error', message: 'No hay prendas contadas para sincronizar.' });
       return false;
     }
 
-    setSyncStatus('syncing');
-    setSyncMessage('Sincronizando con Supabase...');
+    if (!isSupabaseConfigured) {
+      setSyncState({
+        status: 'error',
+        message: 'Supabase no está configurado. Tu conteo sigue guardado en este dispositivo.',
+      });
+      return false;
+    }
+
+    isSyncingRef.current = true;
+    setSyncState({ status: 'syncing', message: 'Sincronizando con Supabase...' });
 
     try {
-      // Preparar payload
-      const rows: InventoryCountRow[] = [];
       const now = new Date();
       const isoNow = now.toISOString();
 
-      INITIAL_PRODUCTS.forEach((prod) => {
-        INITIAL_COLORS.forEach((col) => {
-          const qty = counts[prod.id]?.[col.id] ?? 0;
-          if (qty > 0) {
-            rows.push({
-              product_id: prod.id,
-              color_id: col.id,
-              quantity: qty,
-              timestamp: isoNow,
-            });
-          }
-        });
-      });
-
-      if (isSupabaseConfigured) {
-        const { error } = await supabase.from('inventory_counts').insert(rows);
-        if (error) {
-          throw error;
-        }
-      } else {
-        // Simulación offline en caso de que falten credenciales
-        await new Promise((resolve) => setTimeout(resolve, 800));
-      }
-
-      // Construir registro de historial local
-      const recordSummary: SyncRecordItem[] = [];
-      INITIAL_PRODUCTS.forEach((prod) => {
-        const colorItems: SyncRecordColorBreakdown[] = [];
-        let productSum = 0;
-        INITIAL_COLORS.forEach((col) => {
-          const qty = counts[prod.id]?.[col.id] ?? 0;
-          if (qty > 0) {
-            productSum += qty;
-            colorItems.push({
-              colorId: col.id,
-              colorName: col.name,
-              abbreviation: col.abbreviation,
-              hex: col.hex,
-              quantity: qty,
-            });
-          }
-        });
-
-        if (productSum > 0) {
-          recordSummary.push({
-            productId: prod.id,
-            productName: prod.name,
-            referenceCode: prod.referenceCode,
-            totalQuantity: productSum,
-            colors: colorItems,
-          });
-        }
-      });
+      const { error } = await supabase.from('inventory_counts').insert(summaryToRows(summary, isoNow));
+      if (error) throw error;
 
       const newRecord: SyncRecord = {
         id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `sync-${Date.now()}`,
         timestamp: formatDisplayTimestamp(now),
         isoDate: isoNow,
-        totalUnits: grandTotal,
-        summary: recordSummary,
+        totalUnits: unitsSent,
+        summary,
       };
-
       const updatedHistory = [newRecord, ...syncHistory].slice(0, MAX_HISTORY_RECORDS);
       setSyncHistory(updatedHistory);
-      try {
-        localStorage.setItem(SYNC_HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
-      } catch (histErr) {
-        console.error('Error saving sync history to localStorage:', histErr);
+      writeHistory(updatedHistory);
+
+      // Descontar solo lo enviado: lo tecleado durante el await se conserva.
+      const remaining = subtractCounts(countsRef.current, snapshot);
+      if (Object.keys(remaining).length === 0) {
+        countsRef.current = {};
+        clearCounts();
+        setCounts({});
+      } else {
+        commitCounts(remaining);
       }
 
-      // Éxito: Limpiar borrador en localStorage y emitir háptica
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-      const unitsCounted = grandTotal;
-      setCounts({});
       triggerHaptic(25);
-      setSyncStatus('success');
-      setSyncMessage(`¡Sincronizado con éxito! (${unitsCounted} pçs guardadas)`);
+      setSyncState({
+        status: 'success',
+        message: `¡Sincronizado con éxito! (${unitsSent} pçs guardadas)`,
+      });
       return true;
     } catch (err: unknown) {
       console.error('Error during Supabase sync:', err);
-      setSyncStatus('error');
-      const msg = err instanceof Error ? err.message : 'Error al conectar con Supabase';
-      setSyncMessage(`Fallo de sincronización: ${msg}`);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Error al conectar con Supabase';
+      setSyncState({
+        status: 'error',
+        message: `Fallo de sincronización: ${msg}. Tu conteo sigue guardado.`,
+      });
       return false;
+    } finally {
+      isSyncingRef.current = false;
     }
-  };
+  }, [syncHistory, commitCounts]);
 
-  const exportCurrentToCSV = useCallback((): boolean => {
-    return exportInventoryToCSV(counts, INITIAL_PRODUCTS, INITIAL_COLORS);
-  }, [counts]);
+  /**
+   * Descarga el borrador actual como CSV de respaldo.
+   *
+   * @returns `true` si se exportó algo; `false` si el conteo estaba vacío.
+   */
+  const exportCurrentToCSV = useCallback(
+    (): boolean => exportInventoryToCSV(counts, INITIAL_PRODUCTS, INITIAL_COLORS),
+    [counts]
+  );
 
   return {
     counts,
@@ -221,8 +204,8 @@ export function useInventory() {
     updateQuantity,
     getProductTotal,
     grandTotal,
-    syncStatus,
-    syncMessage,
+    syncStatus: syncState.status,
+    syncMessage: syncState.message,
     syncToSupabase,
     triggerHaptic,
     syncHistory,

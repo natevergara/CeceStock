@@ -20,8 +20,9 @@ export const CarouselIndicator: React.FC<CarouselIndicatorProps> = ({
             key={idx}
             type="button"
             aria-label={`Ir al producto ${idx + 1}`}
+            aria-current={isActive ? 'page' : undefined}
             onClick={() => onSelect(idx)}
-            className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 cursor-pointer active:scale-95 ${
+            className={`relative after:absolute after:-inset-2 after:content-[''] h-1.5 sm:h-2 rounded-full transition-all duration-300 cursor-pointer active:scale-[0.97] ${
               isActive
                 ? 'w-6 bg-accent-sapphire shadow-[0_0_8px_rgba(59,130,246,0.6)]'
                 : 'w-1.5 sm:w-2 bg-border-subtle hover:bg-text-secondary/50'

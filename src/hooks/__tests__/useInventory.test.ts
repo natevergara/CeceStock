@@ -131,4 +131,79 @@ describe('useInventory hook', () => {
     expect(result.current.grandTotal).toBe(0);
     expect(result.current.getQuantity('prod-001', 'col-pt')).toBe(0);
   });
+
+  // Test 5: una edición hecha mientras se sincroniza NO debe perderse
+  it('conserva lo tecleado durante la sincronización', async () => {
+    const { supabase } = await import('../../lib/supabase');
+    let release: (v: { error: null }) => void = () => {};
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      insert: vi.fn().mockReturnValue(new Promise((r) => { release = r; })),
+    } as never);
+
+    const { result } = renderHook(() => useInventory());
+    act(() => {
+      result.current.updateQuantity('prod-001', 'col-pt', 5);
+    });
+
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      pending = result.current.syncToSupabase();
+    });
+    // El operario sigue contando mientras Supabase responde
+    act(() => {
+      result.current.updateQuantity('prod-001', 'col-pt', 7);
+      result.current.updateQuantity('prod-002', 'col-ro', 3);
+    });
+    await act(async () => {
+      release({ error: null });
+      await pending;
+    });
+
+    expect(result.current.getQuantity('prod-001', 'col-pt')).toBe(2);
+    expect(result.current.getQuantity('prod-002', 'col-ro')).toBe(3);
+    expect(JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}')).toEqual({
+      'prod-001': { 'col-pt': 2 },
+      'prod-002': { 'col-ro': 3 },
+    });
+  });
+
+  // Test 6: si Supabase falla, el borrador permanece intacto
+  it('conserva el borrador si Supabase devuelve error', async () => {
+    const { supabase } = await import('../../lib/supabase');
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      insert: vi.fn().mockResolvedValue({ error: { message: 'boom' } }),
+    } as never);
+
+    const { result } = renderHook(() => useInventory());
+    act(() => {
+      result.current.updateQuantity('prod-001', 'col-pt', 4);
+    });
+
+    let success = true;
+    await act(async () => {
+      success = await result.current.syncToSupabase();
+    });
+
+    expect(success).toBe(false);
+    expect(result.current.syncStatus).toBe('error');
+    expect(result.current.getQuantity('prod-001', 'col-pt')).toBe(4);
+    expect(localStorage.getItem(LOCAL_STORAGE_KEY)).not.toBeNull();
+  });
+
+  // Test 7: JSON corrupto o con forma inesperada no rompe la app
+  it('ignora un borrador corrupto o con forma inesperada en localStorage', () => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, '{no es json');
+    expect(renderHook(() => useInventory()).result.current.counts).toEqual({});
+
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([1, 2, 3]));
+    expect(renderHook(() => useInventory()).result.current.counts).toEqual({});
+
+    localStorage.setItem(
+      LOCAL_STORAGE_KEY,
+      JSON.stringify({ 'prod-001': { 'col-pt': 3, 'col-ow': 'x', 'col-rs': -2 }, 'prod-002': null })
+    );
+    expect(renderHook(() => useInventory()).result.current.counts).toEqual({
+      'prod-001': { 'col-pt': 3 },
+    });
+  });
 });

@@ -136,7 +136,7 @@ El sistema de diseño adopta una atmósfera de **Obsidiana Táctica** (`#090A0F`
 - Protección táctil: `select-none` en toda la app (excepto dentro de inputs numéricos) y `[-webkit-tap-highlight-color: transparent]`.
 
 ### Estructura de la Tarjeta de Producto (`ProductCard`)
-La aplicación prescinde del scroll vertical infinito; se navega mediante deslizamiento horizontal (Swipe) entre tarjetas autónomas. La tarjeta ha sido matemáticamente ajustada para que los 13 colores quepan en una sola vista sin scroll vertical:
+La aplicación prescinde del scroll vertical infinito; se navega mediante deslizamiento horizontal (Swipe) entre tarjetas autónomas. La tarjeta ha sido matemáticamente ajustada para que los 14 colores quepan en una sola vista sin scroll vertical:
 
 1. **Cabecera (Top Bar):**
    - **Izquierda:** Icono Lucide `Shirt` en contenedor compacto `w-7 h-7` + etiqueta `REF-XXX` en `text-secondary`.
@@ -145,7 +145,7 @@ La aplicación prescinde del scroll vertical infinito; se navega mediante desliz
    - Cuadrícula con espaciado vertical reducido a `gap-y-1.5` y horizontal a `gap-x-2`.
    - Cada celda (`py-1.5 px-2`, `rounded-xl`) contiene:
      - **Indicador izquierdo:** Círculo de color (`HEX` de la tela, `w-6 h-6 shrink-0`).
-       - *Contraste para tonos oscuros:* Detección de luminosidad ITU-R BT.709 ($< 65$). Tonos oscuros como **Preto**, **Vinho** y **Marrom** incorporan un anillo perimetral `ring-1 ring-slate-500/80 border border-slate-600/90` con micro-brillo para evitar mimetizarse con el fondo `#13161F`.
+       - *Contraste para tonos oscuros:* Detección de luminosidad ITU-R BT.709 ($< 65$). Tonos oscuros como **Preto**, **Vinho**, **Marrom** y **Azul Demin** incorporan un anillo perimetral `ring-1 ring-slate-500/80 border border-slate-600/90` con micro-brillo para evitar mimetizarse con el fondo `#13161F`.
        - *Abreviatura:* Código de 2 letras en `text-xs` bold + nombre en `text-[10px]`.
      - **Campo derecho:** Input numérico directo (`inputMode="numeric"`, `pattern="[0-9]*"`), con altura calibrada `h-9`, texto centrado (`text-center`), auto-selección total al enfocar (`select()`) y auto-avance a la siguiente casilla al pulsar Enter.
 3. **Pie (Navegación e Indicador de Carrusel):**
@@ -171,6 +171,7 @@ La aplicación prescinde del scroll vertical infinito; se navega mediante desliz
 | **Vinho** | `VN` | `#831843` | Círculo borgoña / vino |
 | **Marrom** | `MR` | `#78350F` | Círculo marrón castaño |
 | **Areia** | `AR` | `#E7D8B0` | Círculo beige arena |
+| **Azul Demin** | `AD` | `#1E3A5F` | Círculo azul denim índigo profundo con micro-borde |
 
 ---
 

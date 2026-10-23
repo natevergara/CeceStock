@@ -50,8 +50,8 @@ Cualquier cambio de UI debe adherirse a estas restricciones:
 - **Auto-Select:** Al recibir foco, debe seleccionarse todo el valor existente para que el usuario pueda escribir un número nuevo directamente sin borrar primero con backspace.
 - **Auto-Advance (Enter):** Al presionar "Enter" en el teclado virtual móvil, el foco debe transferirse inmediatamente a la casilla del siguiente color usando una matriz o lista de `React.useRef`.
 - **Alineación monoespaciada:** Usar siempre la clase `tabular-nums` de Tailwind en inputs y en los badges de sumatoria para evitar que la interfaz se mueva cuando cambian los dígitos.
-- **Contraste de Tonos Oscuros:** Colores con baja luminosidad (Preto `#18181B`, Vinho `#831843`, Marrom `#78350F`) deben incluir un micro-anillo perimetral (`ring-1 ring-slate-500/80 border border-slate-600/90`) para evitar fundirse con la superficie de la tarjeta `#13161F`.
-- **Contención en Pantalla Única:** La tarjeta completa con sus 13 colores debe visualizarse en una sola vista sin forzar scroll vertical interno (`p-2.5`, `gap-y-1.5`, `py-1.5 px-2` por celda).
+- **Contraste de Tonos Oscuros:** Colores con baja luminosidad (Preto `#18181B`, Vinho `#831843`, Marrom `#78350F`, Azul Demin `#1E3A5F`) deben incluir un micro-anillo perimetral (`ring-1 ring-slate-500/80 border border-slate-600/90`) para evitar fundirse con la superficie de la tarjeta `#13161F`.
+- **Contención en Pantalla Única:** La tarjeta completa con sus 14 colores (7 filas de 2 columnas) debe visualizarse en una sola vista sin forzar scroll vertical interno (`p-2.5`, `gap-y-1.5`, `py-1.5 px-2` por celda).
 
 ### 3.3. Gestos y Háptica
 - **Swipe Horizontal:** Umbral mínimo de 50px de arrastre táctil para cambiar de producto.
@@ -84,7 +84,7 @@ Cualquier cambio de UI debe adherirse a estas restricciones:
 6. `REF-006` — **Macaquino Yan**
 7. `REF-007` — **Conjunto Moly**
 
-### 13 Colores Estándar:
+### 14 Colores Estándar:
 | Nombre | Abreviatura | HEX |
 | :--- | :---: | :---: |
 | Preto | `PT` | `#18181B` |
@@ -100,6 +100,7 @@ Cualquier cambio de UI debe adherirse a estas restricciones:
 | Vinho | `VN` | `#831843` |
 | Marrom | `MR` | `#78350F` |
 | Areia | `AR` | `#E7D8B0` |
+| Azul Demin | `AD` | `#1E3A5F` |
 
 ---
 
@@ -112,12 +113,20 @@ CeceStock/
 │   │   ├── ProductCard.tsx        # Tarjeta autónoma de producto (Header + Grid)
 │   │   ├── ColorInput.tsx         # Celda de matriz (círculo HEX + abreviatura + input)
 │   │   ├── CarouselIndicator.tsx  # Barra de paginación (dots con píldora expandida)
-│   │   └── SyncButton.tsx         # Botón de guardado y sincronización Supabase
+│   │   ├── SyncButton.tsx         # Botón de guardado y sincronización Supabase
+│   │   ├── PreSyncModal.tsx       # Auditoría del lote antes de enviar
+│   │   └── HistoryDrawer.tsx      # Historial de lotes y CSV de respaldo
 │   ├── hooks/
-│   │   └── useInventory.ts        # Lógica de conteo, persistencia y sync Supabase
+│   │   ├── useInventory.ts        # Lógica de conteo, persistencia y sync Supabase
+│   │   └── useOnlineStatus.ts     # Estado de conectividad
 │   ├── lib/
 │   │   ├── supabase.ts            # Cliente Supabase tipado
-│   │   └── constants.ts           # Catálogo inicial de productos y colores
+│   │   ├── constants.ts           # Catálogo inicial de productos y colores
+│   │   ├── storage.ts             # Lectura/escritura validada de localStorage
+│   │   ├── inventorySummary.ts    # Resumen de lote y resta de lo ya enviado
+│   │   ├── colorUtils.ts          # Detección de tonos oscuros/claros
+│   │   ├── haptics.ts             # Vibración táctil
+│   │   └── csvExport.ts           # Exportación CSV de respaldo
 │   ├── types/
 │   │   └── inventory.ts           # Definiciones TypeScript de entidades
 │   ├── App.tsx                    # Orquestador del carrusel táctil y safe areas

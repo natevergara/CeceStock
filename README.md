@@ -25,8 +25,8 @@ Diseñado con **Stitch MCP** y documentado en [`DESIGN.md`](./DESIGN.md):
 - **Fondo General:** `#090A0F` (Negro obsidiana táctico).
 - **Tarjetas:** `#13161F` (Gris naval oscuro) con micro-borde `#2A3042`.
 - **Inputs:** `#1A1E2B` (Contenedor contrastado para dígitos con altura `h-9` y centrado).
-- **Contraste de Tonos Oscuros:** Anillo perimetral reforzado (`ring-1 ring-slate-500/80`) para colores oscuros (`PT`, `VN`, `MR`).
-- **Layout Vertical Zero-Scroll:** Matriz compactada (`gap-y-1.5`, `py-1.5`) para que los 13 colores entren al 100% en la pantalla sin scroll vertical.
+- **Contraste de Tonos Oscuros:** Anillo perimetral reforzado (`ring-1 ring-slate-500/80`) para colores oscuros (`PT`, `VN`, `MR`, `AD`).
+- **Layout Vertical Zero-Scroll:** Matriz compactada (`gap-y-1.5`, `py-1.5`) para que los 14 colores entren al 100% en la pantalla sin scroll vertical.
 - **Textos:** `#FFFFFF` (Primario) y `#94A3B8` (Secundario).
 - **Acento Primario:** `#3B82F6` (Azul zafiro para píldora activa y sync).
 - **Estado Focus:** `#60A5FA`.
@@ -46,16 +46,16 @@ Diseñado con **Stitch MCP** y documentado en [`DESIGN.md`](./DESIGN.md):
 6. `REF-006` — **Macaquino Yan**
 7. `REF-007` — **Conjunto Moly**
 
-### 13 Colores Estándar del Negocio:
-`Preto` (`PT`), `Off White` (`OW`), `Rosa` (`RS`), `Rose` (`RO`), `Verde Menta` (`VM`), `Verde Oliva` (`VO`), `Vermelho` (`VE`), `Lilás` (`LL`), `Amarelo` (`AM`), `Azul` (`AZ`), `Vinho` (`VN`), `Marrom` (`MR`), `Areia` (`AR`).
+### 14 Colores Estándar del Negocio:
+`Preto` (`PT`), `Off White` (`OW`), `Rosa` (`RS`), `Rose` (`RO`), `Verde Menta` (`VM`), `Verde Oliva` (`VO`), `Vermelho` (`VE`), `Lilás` (`LL`), `Amarelo` (`AM`), `Azul` (`AZ`), `Vinho` (`VN`), `Marrom` (`MR`), `Areia` (`AR`), `Azul Demin` (`AD`).
 
 ---
 
 ## 🚀 Puesta en Marcha Local
 
 ### Requisitos
-- Node.js \(\ge 18\)
-- npm o pnpm
+- Node.js 20 (ver `.nvmrc`; con `nvm use`)
+- npm
 
 ### Instalación y Ejecución
 ```bash
@@ -71,6 +71,40 @@ npm run dev
 
 # 4. Compilar para producción (Cloudflare Pages)
 npm run build
+```
+
+### Scripts
+| Comando | Descripción |
+| :--- | :--- |
+| `npm run dev` | Servidor de desarrollo (puerto 5173, accesible en red local) |
+| `npm run build` | Chequeo estricto de TypeScript + build de producción |
+| `npm test` / `npm run test:watch` | Tests unitarios (Vitest) |
+| `npm run test:e2e` | Tests móviles end-to-end (Playwright) |
+
+### Base de datos (Supabase)
+Ejecuta [`supabase/schema.sql`](./supabase/schema.sql) en el SQL Editor de Supabase. La política de seguridad solo permite **consultar e insertar** conteos (no modificar ni borrar). Si tu base ya tenía la política antigua `FOR ALL`, el script la elimina.
+
+---
+
+## 🛡️ Comportamiento de Guardado y Sincronización
+- El conteo se guarda en `localStorage` en cada pulsación.
+- **El borrador solo se descuenta tras un guardado exitoso** en Supabase, y únicamente por lo enviado: lo que se teclee durante la sincronización se conserva.
+- Si no hay conexión, faltan credenciales o Supabase responde con error, se muestra un mensaje y **el conteo permanece intacto** en el dispositivo.
+- El historial de las últimas sincronizaciones y la descarga de un **CSV de respaldo** están en el botón de historial (cabecera).
+- Si falta `VITE_SUPABASE_ANON_KEY`, la app abre normalmente pero la sincronización queda deshabilitada con aviso.
+
+---
+
+## 🗂️ Estructura de Código
+```
+src/
+├── components/   ProductCard, ColorInput, CarouselIndicator, SyncButton,
+│                 PreSyncModal (auditoría previa), HistoryDrawer (historial + CSV)
+├── hooks/        useInventory (conteo, persistencia, sync), useOnlineStatus
+├── lib/          constants, supabase, storage (localStorage validado),
+│                 inventorySummary (resumen/resta de conteos), colorUtils,
+│                 haptics, csvExport
+└── types/        inventory
 ```
 
 ---

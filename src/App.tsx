@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { Sparkles, Layers, WifiOff, History } from 'lucide-react';
+import { useState, useRef, useCallback, useLayoutEffect } from 'react';
+import { Sparkles, WifiOff, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { INITIAL_PRODUCTS, INITIAL_COLORS, SWIPE_THRESHOLD_PX } from './lib/constants';
 import { useInventory } from './hooks/useInventory';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -37,14 +37,17 @@ export function App() {
     inputRefs.current[index] = el;
   }, []);
 
-  const handleEnterNext = useCallback((currentIndex: number) => {
-    const nextIndex = (currentIndex + 1) % INITIAL_COLORS.length;
-    const nextEl = inputRefs.current[nextIndex];
-    if (nextEl) {
-      nextEl.focus();
-      nextEl.select();
+  const pendingFocusRef = useRef(false);
+
+  // Transferencia de foco inmediata y síncrona en el cambio de tarjeta (evita cerrar teclado en iOS)
+  useLayoutEffect(() => {
+    if (!pendingFocusRef.current) return;
+    pendingFocusRef.current = false;
+    const firstEl = inputRefs.current[0];
+    if (firstEl) {
+      firstEl.focus();
     }
-  }, []);
+  }, [activeProductIndex]);
 
   // Navegación de producto con háptica
   const goToProduct = useCallback(
@@ -55,6 +58,28 @@ export function App() {
       }
     },
     [activeProductIndex, triggerHaptic]
+  );
+
+  const handleEnterNext = useCallback(
+    (currentIndex: number) => {
+      if (currentIndex < INITIAL_COLORS.length - 1) {
+        const nextEl = inputRefs.current[currentIndex + 1];
+        if (nextEl) {
+          nextEl.focus();
+          nextEl.select();
+        }
+      } else {
+        // Fin de la prenda actual (Areia completada): pasar a la siguiente tarjeta si existe
+        if (activeProductIndex < INITIAL_PRODUCTS.length - 1) {
+          pendingFocusRef.current = true;
+          goToProduct(activeProductIndex + 1);
+        } else {
+          // Última prenda y último color alcanzado: confirmación háptica suave
+          triggerHaptic(15);
+        }
+      }
+    },
+    [activeProductIndex, goToProduct, triggerHaptic]
   );
 
   // Manejo de Gestos Táctiles (Swipe Horizontal >= 50px)
@@ -103,7 +128,7 @@ export function App() {
 
   return (
     <div
-      className="flex flex-col justify-between w-full h-[100dvh] max-w-md mx-auto px-3 pt-[env(safe-area-inset-top,8px)] pb-[env(safe-area-inset-bottom,8px)] bg-obsidian text-text-primary select-none overflow-hidden"
+      className="flex flex-col justify-between w-full h-[100dvh] max-w-md mx-auto px-3 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-obsidian text-text-primary select-none overflow-hidden overscroll-y-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -142,7 +167,7 @@ export function App() {
               triggerHaptic(10);
               setIsHistoryDrawerOpen(true);
             }}
-            className="w-7 h-7 rounded-lg bg-card hover:bg-input border border-border-subtle flex items-center justify-center text-text-secondary hover:text-white transition-all active:scale-95 cursor-pointer relative"
+            className="w-7 h-7 rounded-lg bg-card hover:bg-input border border-border-subtle flex items-center justify-center text-text-secondary hover:text-white transition-all active:scale-[0.97] cursor-pointer relative"
             title="Historial de sincronizaciones recientes"
             aria-label="Ver historial de sincronizaciones"
           >
@@ -162,8 +187,8 @@ export function App() {
         </div>
       </header>
 
-      {/* Zona Central: Tarjeta Autónoma de Producto con Swipe (Sin scroll vertical forzado) */}
-      <main className="flex-1 flex flex-col justify-center min-h-0 py-1">
+      {/* Zona Central: Tarjeta Autónoma de Producto con Swipe (Sin scroll vertical forzado en reposo, auto-scroll focalizado si el teclado virtual se abre) */}
+      <main className="flex-1 flex flex-col justify-start min-h-0 py-1 overflow-y-auto overscroll-contain">
         <ProductCard
           product={currentProduct}
           colors={INITIAL_COLORS}
@@ -177,12 +202,18 @@ export function App() {
 
       {/* Zona Inferior: Paginación y Botón de Sincronización */}
       <footer className="flex flex-col gap-1.5 pt-1.5 border-t border-border-subtle/40 shrink-0">
-        {/* Indicador de 7 Dots con píldora expandida */}
+        {/* Indicador de 7 Dots con píldora expandida y affordance de navegación de pulgar */}
         <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] sm:text-[11px] font-bold text-text-secondary flex items-center gap-1">
-            <Layers className="w-3 h-3 sm:w-3.5 sm:h-3.5" strokeWidth={1.75} />
-            {activeProductIndex + 1} / {INITIAL_PRODUCTS.length}
-          </span>
+          <button
+            type="button"
+            disabled={activeProductIndex === 0}
+            onClick={() => goToProduct(activeProductIndex - 1)}
+            aria-label="Producto anterior"
+            className="-m-1.5 p-1.5 text-[10px] sm:text-[11px] font-bold text-text-secondary flex items-center gap-0.5 tabular-nums disabled:opacity-30 transition-transform active:scale-[0.97] cursor-pointer hover:text-white"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.75} />
+            <span>{activeProductIndex + 1} / {INITIAL_PRODUCTS.length}</span>
+          </button>
 
           <CarouselIndicator
             total={INITIAL_PRODUCTS.length}
@@ -190,9 +221,16 @@ export function App() {
             onSelect={goToProduct}
           />
 
-          <span className="text-[10px] sm:text-[11px] text-text-secondary font-medium truncate max-w-[80px] text-right">
-            {currentProduct.referenceCode}
-          </span>
+          <button
+            type="button"
+            disabled={activeProductIndex === INITIAL_PRODUCTS.length - 1}
+            onClick={() => goToProduct(activeProductIndex + 1)}
+            aria-label="Siguiente producto"
+            className="-m-1.5 p-1.5 text-[10px] sm:text-[11px] text-text-secondary font-bold flex items-center gap-0.5 truncate max-w-[90px] text-right disabled:opacity-30 transition-transform active:scale-[0.97] cursor-pointer hover:text-white"
+          >
+            <span>{activeProductIndex < INITIAL_PRODUCTS.length - 1 ? INITIAL_PRODUCTS[activeProductIndex + 1].referenceCode : 'Final'}</span>
+            <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
         </div>
 
         {/* Botón Principal de Sincronización con notch awareness */}

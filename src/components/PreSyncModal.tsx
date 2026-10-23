@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { X, CloudUpload, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { CountsMap } from '../types/inventory';
-import { INITIAL_PRODUCTS, INITIAL_COLORS } from '../lib/constants';
+import { buildInventorySummary } from '../lib/inventorySummary';
+import { isDarkColor } from '../lib/colorUtils';
 
 interface PreSyncModalProps {
   isOpen: boolean;
@@ -20,39 +21,30 @@ export const PreSyncModal: React.FC<PreSyncModalProps> = ({
   totalUnits,
   isSyncing,
 }) => {
-  // Filtrar solo las prendas y colores que tienen cantidades > 0
-  const countedItems = useMemo(() => {
-    return INITIAL_PRODUCTS.map((product) => {
-      const activeColors = INITIAL_COLORS.map((color) => {
-        const qty = counts[product.id]?.[color.id] ?? 0;
-        return {
-          ...color,
-          quantity: qty,
-        };
-      }).filter((item) => item.quantity > 0);
-
-      const productTotal = activeColors.reduce((sum, item) => sum + item.quantity, 0);
-
-      return {
-        product,
-        colors: activeColors,
-        total: productTotal,
-      };
-    }).filter((item) => item.total > 0);
-  }, [counts]);
+  // Prendas y colores con cantidad > 0 (misma fuente que se envía a Supabase)
+  const countedItems = useMemo(
+    () =>
+      buildInventorySummary(counts).map((item) => ({
+        product: { id: item.productId, name: item.productName, referenceCode: item.referenceCode },
+        colors: item.colors.map((c) => ({
+          id: c.colorId,
+          abbreviation: c.abbreviation,
+          hex: c.hex,
+          quantity: c.quantity,
+        })),
+        total: item.totalQuantity,
+      })),
+    [counts]
+  );
 
   if (!isOpen) return null;
 
-  // Detección de colores oscuros para borde perimetral de contraste
-  const isDarkColor = (hex: string) => {
-    const darkHexes = ['#18181B', '#831843', '#78350F'];
-    return darkHexes.includes(hex.toUpperCase());
-  };
-
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-sm transition-opacity duration-200"
       onClick={onClose}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       <div
         className="w-full max-w-md mx-auto max-h-[88dvh] flex flex-col bg-card border-t border-x border-border-subtle rounded-t-2xl shadow-2xl overflow-hidden select-none"

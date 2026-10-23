@@ -6,7 +6,8 @@ interface SyncButtonProps {
   status: SyncStatus;
   message: string;
   totalUnits: number;
-  onSync: () => void;
+  /** Puede ser síncrona o asíncrona (p. ej. `syncToSupabase`); el resultado se ignora. */
+  onSync: () => void | Promise<unknown>;
   onOpenAudit?: () => void;
 }
 
@@ -94,7 +95,7 @@ export const SyncButton: React.FC<SyncButtonProps> = ({
             onClick={onOpenAudit}
             title="Revisar auditoría de lote"
             aria-label="Revisar auditoría de lote"
-            className="w-11 sm:w-12 h-11 sm:h-12 rounded-xl bg-input border border-border-subtle/80 hover:bg-slate-800 text-text-secondary hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center shrink-0 transition-all duration-200 active:scale-[0.95]"
+            className="w-11 sm:w-12 h-11 sm:h-12 rounded-xl bg-input border border-border-subtle/80 hover:bg-slate-800 text-text-secondary hover:text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center shrink-0 transition-all duration-200 active:scale-[0.97]"
           >
             <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-accent-sapphire" strokeWidth={1.75} />
           </button>

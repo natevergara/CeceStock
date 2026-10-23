@@ -24,6 +24,7 @@ export const INITIAL_COLORS: Color[] = [
   { id: 'col-vn', name: 'Vinho', abbreviation: 'VN', hex: '#831843' },
   { id: 'col-mr', name: 'Marrom', abbreviation: 'MR', hex: '#78350F' },
   { id: 'col-ar', name: 'Areia', abbreviation: 'AR', hex: '#E7D8B0' },
+  { id: 'col-ad', name: 'Azul Demin', abbreviation: 'AD', hex: '#1E3A5F' },
 ];
 
 export const LOCAL_STORAGE_KEY = 'cece_stock_inventory_draft_v1';

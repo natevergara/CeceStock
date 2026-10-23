@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Shirt } from 'lucide-react';
 import { Product, Color } from '../types/inventory';
 import { ColorInput } from './ColorInput';
@@ -22,8 +22,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   setInputRef,
   onEnterNext,
 }) => {
+  const latest = useRef({ onUpdateQuantity, onEnterNext, setInputRef, productId: product.id });
+  latest.current = { onUpdateQuantity, onEnterNext, setInputRef, productId: product.id };
+
+  const handlers = useMemo(
+    () =>
+      colors.map((color, idx) => ({
+        onChange: (qty: number) =>
+          latest.current.onUpdateQuantity(latest.current.productId, color.id, qty),
+        onEnterNext: () => latest.current.onEnterNext(idx),
+        inputRef: (el: HTMLInputElement | null) => latest.current.setInputRef(idx, el),
+      })),
+    [colors, product.id]
+  );
+
   return (
-    <div className="flex flex-col w-full bg-card/90 rounded-2xl border border-border-subtle p-2.5 sm:p-3 shadow-xl backdrop-blur-sm">
+    <div className="flex flex-col w-full my-auto bg-card/90 rounded-2xl border border-border-subtle p-2.5 sm:p-3 shadow-xl backdrop-blur-sm">
       {/* Cabecera Compacta de la Tarjeta */}
       <div className="flex items-center justify-between pb-2 border-b border-border-subtle/70 mb-2">
         {/* Izquierda: Silueta + REF */}
@@ -60,9 +74,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             key={color.id}
             color={color}
             quantity={getQuantity(product.id, color.id)}
-            onChange={(qty) => onUpdateQuantity(product.id, color.id, qty)}
-            onEnterNext={() => onEnterNext(idx)}
-            inputRef={(el) => setInputRef(idx, el)}
+            onChange={handlers[idx].onChange}
+            onEnterNext={handlers[idx].onEnterNext}
+            inputRef={handlers[idx].inputRef}
+            className={colors.length % 2 === 1 && idx === colors.length - 1 ? 'col-span-2' : ''}
           />
         ))}
       </div>
