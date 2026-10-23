@@ -37,19 +37,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 
   return (
-    <div className="flex flex-col w-full my-auto bg-card/90 rounded-2xl border border-border-subtle p-2.5 sm:p-3 shadow-xl backdrop-blur-sm">
-      {/* Cabecera Compacta de la Tarjeta */}
-      <div className="flex items-center justify-between pb-2 border-b border-border-subtle/70 mb-2">
+    <div className="flex flex-col w-full bg-card/90 rounded-2xl border border-border-subtle p-2.5 sm:p-3 tall:p-3.5 shadow-xl backdrop-blur-sm flex-1 min-h-0 justify-between">
+      {/* Cabecera de la Tarjeta */}
+      <div className="flex items-center justify-between pb-2 border-b border-border-subtle/70 mb-1.5 tall:mb-2.5 shrink-0">
         {/* Izquierda: Silueta + REF */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-input flex items-center justify-center text-accent-sapphire border border-border-subtle shrink-0">
-            <Shirt className="w-3.5 h-3.5 sm:w-4 sm:h-4" strokeWidth={1.75} />
+          <div className="w-7 h-7 sm:w-8 sm:h-8 tall:w-9 tall:h-9 rounded-lg bg-input flex items-center justify-center text-accent-sapphire border border-border-subtle shrink-0">
+            <Shirt className="w-3.5 h-3.5 sm:w-4 sm:h-4 tall:w-4.5 tall:h-4.5" strokeWidth={1.75} />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary leading-none">
+            <span className="text-[10px] tall:text-xs font-bold uppercase tracking-wider text-text-secondary leading-none">
               {product.referenceCode}
             </span>
-            <span className="text-[10px] text-text-secondary/80 leading-tight">
+            <span className="text-[10px] tall:text-xs text-text-secondary/80 leading-tight">
               {product.category || 'Cece Boutique'}
             </span>
           </div>
@@ -57,18 +57,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Derecha: Nombre del producto + Badge Suma Total */}
         <div className="flex items-center gap-2 text-right">
-          <h2 className="text-sm sm:text-base font-bold text-text-primary tracking-tight truncate max-w-[130px] sm:max-w-[170px]">
+          <h2 className="text-sm sm:text-base tall:text-lg font-bold text-text-primary tracking-tight truncate max-w-[130px] sm:max-w-[170px] tall:max-w-[200px]">
             {product.name}
           </h2>
-          <div className="px-2 py-0.5 rounded-full bg-accent-sapphire/20 border border-accent-sapphire/40 text-accent-sapphire font-bold text-xs sm:text-sm tabular-nums flex items-center gap-1">
+          <div className="px-2 py-0.5 tall:px-2.5 tall:py-1 rounded-full bg-accent-sapphire/20 border border-accent-sapphire/40 text-accent-sapphire font-bold text-xs sm:text-sm tall:text-base tabular-nums flex items-center gap-1">
             <span>{totalProductCount}</span>
-            <span className="text-[9px] font-normal uppercase text-text-secondary">pçs</span>
+            <span className="text-[9px] tall:text-[10px] font-normal uppercase text-text-secondary">pçs</span>
           </div>
         </div>
       </div>
 
-      {/* Cuerpo: Cuadrícula Compacta de 2 Columnas de Colores (Entra sin forzar scroll) */}
-      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+      {/* Cuerpo: Cuadrícula Adaptativa de 2 Columnas de Colores */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 tall:gap-y-2 extra-tall:gap-y-2.5 flex-1 min-h-0 content-between">
         {colors.map((color, idx) => (
           <ColorInput
             key={color.id}

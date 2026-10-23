@@ -8,12 +8,14 @@ import { CarouselIndicator } from './components/CarouselIndicator';
 import { SyncButton } from './components/SyncButton';
 import { PreSyncModal } from './components/PreSyncModal';
 import { HistoryDrawer } from './components/HistoryDrawer';
+import { useViewportProfile } from './hooks/useViewportProfile';
 
 export function App() {
   const [activeProductIndex, setActiveProductIndex] = useState(0);
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
   const isOnline = useOnlineStatus();
+  const viewportProfile = useViewportProfile();
 
   const {
     counts,
@@ -128,12 +130,12 @@ export function App() {
 
   return (
     <div
-      className="flex flex-col justify-between w-full h-[100dvh] max-w-md mx-auto px-3 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-obsidian text-text-primary select-none overflow-hidden overscroll-y-none"
+      className="flex flex-col justify-between w-full h-[100dvh] max-w-md mx-auto px-3 tall:px-4 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-obsidian text-text-primary select-none overflow-hidden overscroll-y-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
       {/* Barra Superior / Header de Marca Compacto */}
-      <header className="flex items-center justify-between py-1.5 border-b border-border-subtle/50 mb-1 shrink-0">
+      <header className="flex items-center justify-between py-1.5 tall:py-2.5 border-b border-border-subtle/50 mb-1 tall:mb-2 shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-accent-sapphire/20 border border-accent-sapphire/40 flex items-center justify-center text-accent-sapphire shrink-0">
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -188,7 +190,11 @@ export function App() {
       </header>
 
       {/* Zona Central: Tarjeta Autónoma de Producto con Swipe (Sin scroll vertical forzado en reposo, auto-scroll focalizado si el teclado virtual se abre) */}
-      <main className="flex-1 flex flex-col justify-start min-h-0 py-1 overflow-y-auto overscroll-contain">
+      <main
+        className={`flex-1 flex flex-col min-h-0 py-1 tall:py-2.5 overflow-y-auto overscroll-contain ${
+          viewportProfile.isKeyboardOpen ? 'justify-start' : 'justify-between'
+        }`}
+      >
         <ProductCard
           product={currentProduct}
           colors={INITIAL_COLORS}
@@ -201,7 +207,7 @@ export function App() {
       </main>
 
       {/* Zona Inferior: Paginación y Botón de Sincronización */}
-      <footer className="flex flex-col gap-1.5 pt-1.5 border-t border-border-subtle/40 shrink-0">
+      <footer className="flex flex-col gap-1.5 tall:gap-2.5 pt-1.5 tall:pt-2.5 border-t border-border-subtle/40 shrink-0">
         {/* Indicador de 7 Dots con píldora expandida y affordance de navegación de pulgar */}
         <div className="flex items-center justify-between px-1">
           <button

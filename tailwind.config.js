@@ -20,6 +20,11 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      screens: {
+        'short': { raw: '(max-height: 680px)' },
+        'tall': { raw: '(min-height: 740px)' },
+        'extra-tall': { raw: '(min-height: 840px)' },
+      },
     },
   },
   plugins: [],
