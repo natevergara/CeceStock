@@ -41,8 +41,8 @@ Cualquier cambio de UI debe adherirse a estas restricciones:
   ```tsx
   <input
     type="text"
-    inputMode="numeric"
-    pattern="[0-9]*"
+    inputMode="tel"        // teclado con "+" para sumas tipo Excel (50+20)
+    pattern="[0-9+]*"
     className="w-11 sm:w-12 h-9 text-center font-bold text-sm sm:text-base tabular-nums ..."
     onFocus={(e) => e.target.select()}
   />
