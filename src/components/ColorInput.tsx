@@ -19,20 +19,31 @@ const ColorInputBase: React.FC<ColorInputProps> = ({
   inputRef,
   className = '',
 }) => {
+  // Borrador tipo "Excel": mientras el campo tiene foco se muestra la fórmula (ej. 50+20);
+  // al salir se muestra el total. El total se persiste en cada pulsación.
+  const [draft, setDraft] = React.useState<string | null>(null);
+  const focusQty = React.useRef(0);
+
+  const sumFormula = (formula: string): number =>
+    formula
+      .split('+')
+      .reduce((acc, part) => acc + (part === '' ? 0 : parseInt(part, 10) || 0), 0);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (raw === '') {
-      onChange(0);
-      return;
+    let clean = e.target.value.replace(/[^0-9+]/g, '');
+    // Si la primera tecla es "+", se suma al valor que ya tenía la celda.
+    if (draft === null && clean.startsWith('+') && focusQty.current > 0) {
+      clean = `${focusQty.current}${clean}`;
     }
-    const parsed = parseInt(raw.replace(/\D/g, ''), 10);
-    onChange(isNaN(parsed) ? 0 : parsed);
+    setDraft(clean);
+    onChange(sumFormula(clean));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       if (e.repeat) return;
       e.preventDefault();
+      setDraft(null);
       onEnterNext();
     }
   };
@@ -84,22 +95,24 @@ const ColorInputBase: React.FC<ColorInputProps> = ({
       <input
         ref={inputRef}
         type="text"
-        inputMode="numeric"
+        inputMode="tel"
         enterKeyHint="next"
-        pattern="[0-9]*"
+        pattern="[0-9+]*"
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
         aria-label={`${color.name} (${color.abbreviation})`}
-        value={quantity === 0 ? '' : quantity}
+        value={draft ?? (quantity === 0 ? '' : String(quantity))}
         placeholder="0"
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onBlur={() => setDraft(null)}
         onFocus={(e) => {
+          focusQty.current = quantity;
           e.currentTarget.select();
           e.currentTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' });
         }}
-        className={`w-11 sm:w-12 tall:w-12 extra-tall:w-14 h-9 tall:h-10 extra-tall:h-11 text-center font-bold text-sm sm:text-base tall:text-lg bg-input rounded-lg border focus:outline-none focus:border-accent-focus tabular-nums transition-[border-color,background-color,transform] active:scale-[0.97] placeholder:text-text-secondary/40 select-text ${
+        className={`w-11 sm:w-12 tall:w-12 extra-tall:w-14 h-9 tall:h-10 extra-tall:h-11 text-center font-bold ${draft?.includes('+') ? 'text-xs' : 'text-sm sm:text-base tall:text-lg'} bg-input rounded-lg border focus:outline-none focus:border-accent-focus tabular-nums transition-[border-color,background-color,transform] active:scale-[0.97] placeholder:text-text-secondary/40 select-text ${
           hasStock ? 'border-emerald-500/40 text-emerald-300 font-extrabold' : 'border-border-subtle text-text-primary'
         }`}
       />
